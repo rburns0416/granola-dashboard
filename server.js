@@ -15,6 +15,8 @@ app.get('/api/meetings/:id', async (req, res) => {
       headers: { 'Authorization': `Bearer ${GRANOLA_API_KEY}` }
     });
     const data = await response.json();
+    console.log('Detail keys:', JSON.stringify(Object.keys(data)));
+    if (data.note) console.log('Note keys:', JSON.stringify(Object.keys(data.note)));
     if (!response.ok) return res.status(response.status).json(data);
     res.json(data);
   } catch (err) {
