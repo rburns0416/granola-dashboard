@@ -261,6 +261,7 @@ export default function GranolaDashboardSystem() {
     const summaryMd = meetingDetail.summary_markdown || '';
     const summaryText = meetingDetail.summary_text || '';
     const transcript = meetingDetail.transcript || '';
+    const extracted = extractData(meetingDetail);
     const attendees = meetingDetail.attendees || selectedMeeting.attendees || [];
     const webUrl = meetingDetail.web_url || '';
     const createdAt = meetingDetail.created_at || selectedMeeting.created_at || selectedMeeting.date;
@@ -308,6 +309,32 @@ export default function GranolaDashboardSystem() {
                 <h2 className="text-lg font-semibold text-white mb-4">Meeting Summary</h2>
                 <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">{summaryText}</p>
               </div>
+            )}
+
+            {extracted.actionItems.length > 0 && (
+              <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                <button onClick={() => toggleSection('actions')} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-750 transition">
+                  <h2 className="text-lg font-semibold text-white">Action Items <span className="text-sm text-slate-500 ml-2">({extracted.actionItems.length})</span></h2>
+                  <ChevronDown className={`w-5 h-5 text-slate-400 transition ${expandedSections.actions ? 'rotate-180' : ''}`} />
+                </button>
+                {expandedSections.actions && (
+                  <div className="px-6 py-4 border-t border-slate-700 space-y-3">
+                    {extracted.actionItems.map(item => <ActionItemCard key={item.id} item={item} />)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {extracted.decisions.length > 0 && (
+              <CollapsibleSection title="Decisions" section="decisions" items={extracted.decisions} />
+            )}
+
+            {extracted.blockers.length > 0 && (
+              <CollapsibleSection title="Blockers" section="blockers" items={extracted.blockers} isBlocker />
+            )}
+
+            {extracted.quotes.length > 0 && (
+              <CollapsibleSection title="Key Quotes" section="quotes" items={extracted.quotes} isQuote />
             )}
 
             {transcript && (
