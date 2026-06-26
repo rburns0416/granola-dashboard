@@ -24,7 +24,6 @@ export default function GranolaDashboardSystem() {
     if (saved) {
       const state = JSON.parse(saved);
       setCompletedItems(state.completed || {});
-      setMeetingDetails(state.details || {});
     }
     fetchMeetings();
   }, []);
@@ -37,12 +36,13 @@ export default function GranolaDashboardSystem() {
     return () => clearInterval(interval);
   }, []);
 
-  const saveState = useCallback((completed, details) => {
-    localStorage.setItem('granola-dashboard-state', JSON.stringify({
-      completed: completed || completedItems,
-      details: details || meetingDetails
-    }));
-  }, [completedItems, meetingDetails]);
+  const saveState = useCallback((completed) => {
+    try {
+      localStorage.setItem('granola-dashboard-state', JSON.stringify({
+        completed: completed || completedItems
+      }));
+    } catch {}
+  }, [completedItems]);
 
   const fetchMeetings = async () => {
     setLoading(true);
@@ -69,9 +69,7 @@ export default function GranolaDashboardSystem() {
       if (!res.ok) throw new Error('Failed to load meeting');
       const data = await res.json();
       setMeetingDetail(data);
-      const newDetails = { ...meetingDetails, [id]: data };
-      setMeetingDetails(newDetails);
-      saveState(null, newDetails);
+      setMeetingDetails(prev => ({ ...prev, [id]: data }));
     } catch (err) {
       setError(err.message);
     }
@@ -105,7 +103,7 @@ export default function GranolaDashboardSystem() {
           if ((i + 1) % 5 === 0 || i === unloaded.length - 1) {
             setMeetingDetails(prev => {
               const updated = { ...prev, ...batchUpdates };
-              try { saveState(null, updated); } catch {}
+              // details kept in memory only
               return updated;
             });
           }
@@ -115,7 +113,7 @@ export default function GranolaDashboardSystem() {
 
     setMeetingDetails(prev => {
       const updated = { ...prev, ...batchUpdates };
-      try { saveState(null, updated); } catch {}
+      // details kept in memory only
       return updated;
     });
     setLoadingActions(false);
