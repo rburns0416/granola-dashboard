@@ -91,8 +91,8 @@ export default function GranolaDashboardSystem() {
   };
 
   const extractData = (detail) => {
-    const notes = detail?.notes || detail?.private_notes || detail?.content || detail?.transcript || '';
-    const summary = detail?.summary || detail?.ai_summary || '';
+    const notes = detail?.transcript || detail?.notes || detail?.private_notes || detail?.content || '';
+    const summary = detail?.summary_text || detail?.summary_markdown || detail?.summary || detail?.ai_summary || '';
     const text = `${notes}\n${summary}`;
     const lines = text.split('\n').filter(l => l.trim());
     const decisions = [];
