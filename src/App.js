@@ -46,7 +46,7 @@ export default function GranolaDashboardSystem() {
       const res = await fetch('/api/meetings');
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
-      const list = data.docs || data.meetings || data || [];
+      const list = data.notes || data.docs || data.meetings || data || [];
       setMeetings(Array.isArray(list) ? list : []);
     } catch (err) {
       setError(err.message);
