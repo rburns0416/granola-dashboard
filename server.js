@@ -29,9 +29,14 @@ app.get('/api/meetings', async (req, res) => {
       headers: { 'Authorization': `Bearer ${GRANOLA_API_KEY}` }
     });
     const data = await response.json();
+    console.log('Response status:', response.status);
+    console.log('Response keys:', JSON.stringify(Object.keys(data)));
+    console.log('Is array:', Array.isArray(data));
+    if (Array.isArray(data)) console.log('Array length:', data.length);
     if (!response.ok) return res.status(response.status).json(data);
     res.json(data);
   } catch (err) {
+    console.error('Fetch error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
