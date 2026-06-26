@@ -78,23 +78,46 @@ export default function GranolaDashboardSystem() {
     setLoadingDetail(false);
   };
 
+  const [loadProgress, setLoadProgress] = useState({ current: 0, total: 0 });
+
   const loadAllMeetingDetails = async () => {
     setLoadingActions(true);
     const unloaded = meetings.filter(m => !meetingDetails[m.id || m._id]);
-    for (const meeting of unloaded) {
+    setLoadProgress({ current: 0, total: unloaded.length });
+    const batchUpdates = {};
+
+    for (let i = 0; i < unloaded.length; i++) {
       try {
-        const id = meeting.id || meeting._id;
+        const id = unloaded[i].id || unloaded[i]._id;
         const res = await fetch(`/api/meetings/${id}`);
         if (res.ok) {
           const data = await res.json();
-          setMeetingDetails(prev => {
-            const updated = { ...prev, [id]: data };
-            saveState(null, updated);
-            return updated;
-          });
+          const slim = {
+            title: data.title,
+            summary_markdown: data.summary_markdown,
+            summary_text: data.summary_text,
+            attendees: data.attendees,
+            web_url: data.web_url,
+            created_at: data.created_at,
+          };
+          batchUpdates[id] = slim;
+          setLoadProgress({ current: i + 1, total: unloaded.length });
+          if ((i + 1) % 5 === 0 || i === unloaded.length - 1) {
+            setMeetingDetails(prev => {
+              const updated = { ...prev, ...batchUpdates };
+              try { saveState(null, updated); } catch {}
+              return updated;
+            });
+          }
         }
       } catch {}
     }
+
+    setMeetingDetails(prev => {
+      const updated = { ...prev, ...batchUpdates };
+      try { saveState(null, updated); } catch {}
+      return updated;
+    });
     setLoadingActions(false);
   };
 
@@ -467,7 +490,7 @@ export default function GranolaDashboardSystem() {
                 <h3 className="text-lg font-semibold text-white mb-2">Cached Meetings</h3>
                 <p className="text-slate-400 text-sm">{Object.keys(meetingDetails).length} of {meetings.length} meeting details loaded</p>
                 <button onClick={loadAllMeetingDetails} disabled={loadingActions} className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition disabled:opacity-50">
-                  {loadingActions ? 'Loading...' : 'Load All Meeting Details'}
+                  {loadingActions ? `Loading ${loadProgress.current}/${loadProgress.total}...` : 'Load All Meeting Details'}
                 </button>
                 <p className="text-xs text-slate-500 mt-1">Required for full action item tracking across all meetings</p>
               </div>
@@ -509,7 +532,7 @@ export default function GranolaDashboardSystem() {
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6 flex items-center justify-between">
               <p className="text-blue-300 text-sm">{loadedCount} of {meetings.length} meetings loaded. Load all for complete action tracking.</p>
               <button onClick={loadAllMeetingDetails} disabled={loadingActions} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition disabled:opacity-50">
-                {loadingActions ? 'Loading...' : 'Load All'}
+                {loadingActions ? `Loading ${loadProgress.current}/${loadProgress.total}...` : 'Load All'}
               </button>
             </div>
           )}
