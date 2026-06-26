@@ -25,16 +25,27 @@ app.get('/api/meetings/:id', async (req, res) => {
 app.get('/api/meetings', async (req, res) => {
   if (!GRANOLA_API_KEY) return res.status(500).json({ error: 'No API key configured' });
   try {
-    const response = await fetch(`${BASE_URL}/notes`, {
-      headers: { 'Authorization': `Bearer ${GRANOLA_API_KEY}` }
-    });
-    const data = await response.json();
-    console.log('Response status:', response.status);
-    console.log('Response keys:', JSON.stringify(Object.keys(data)));
-    console.log('Is array:', Array.isArray(data));
-    if (Array.isArray(data)) console.log('Array length:', data.length);
-    if (!response.ok) return res.status(response.status).json(data);
-    res.json(data);
+    let allNotes = [];
+    let cursor = null;
+    let hasMore = true;
+
+    while (hasMore) {
+      const url = cursor
+        ? `${BASE_URL}/notes?cursor=${encodeURIComponent(cursor)}`
+        : `${BASE_URL}/notes`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${GRANOLA_API_KEY}` }
+      });
+      const data = await response.json();
+      if (!response.ok) return res.status(response.status).json(data);
+
+      allNotes = allNotes.concat(data.notes || []);
+      hasMore = data.hasMore === true;
+      cursor = data.cursor || null;
+    }
+
+    console.log(`Fetched ${allNotes.length} total meetings`);
+    res.json({ notes: allNotes });
   } catch (err) {
     console.error('Fetch error:', err.message);
     res.status(500).json({ error: err.message });
