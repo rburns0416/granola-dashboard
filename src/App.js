@@ -91,35 +91,83 @@ export default function GranolaDashboardSystem() {
   };
 
   const extractData = (detail) => {
-    const notes = detail?.transcript || detail?.notes || detail?.private_notes || detail?.content || '';
-    const summary = detail?.summary_text || detail?.summary_markdown || detail?.summary || detail?.ai_summary || '';
-    const text = `${notes}\n${summary}`;
-    const lines = text.split('\n').filter(l => l.trim());
+    const summary = detail?.summary_markdown || detail?.summary_text || '';
+    const lines = summary.split('\n');
     const decisions = [];
     const actionItems = [];
     const questions = [];
     const quotes = [];
     const blockers = [];
 
-    lines.forEach((line, idx) => {
-      const lower = line.toLowerCase();
-      const clean = line.replace(/^[\s\-\*•]+/, '').trim();
-      if (!clean) return;
+    let currentSection = '';
+    let actionIdx = 0;
 
-      if (lower.includes('decided') || lower.includes('agreed') || lower.includes('we\'re going') || lower.includes('decision')) {
-        decisions.push({ id: `d${idx}`, text: clean, owner: 'Team' });
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      const lower = trimmed.toLowerCase();
+
+      if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+        currentSection = lower.replace(/^#+\s*/, '');
+        return;
       }
-      if (lower.includes('blocker') || lower.includes('blocked') || lower.includes('stuck') || lower.includes('waiting on')) {
-        blockers.push({ id: `b${idx}`, issue: clean, resolution: 'Pending', severity: 'medium' });
+
+      const isNextSteps = currentSection.includes('next step') || currentSection.includes('action') || currentSection.includes('follow') || currentSection.includes('to do') || currentSection.includes('todo');
+      const isDecision = currentSection.includes('decision') || currentSection.includes('outcome') || currentSection.includes('agreed') || currentSection.includes('resolution');
+      const isBlocker = currentSection.includes('blocker') || currentSection.includes('risk') || currentSection.includes('concern') || currentSection.includes('challenge') || currentSection.includes('gap');
+
+      if (isNextSteps && trimmed.startsWith('- **')) {
+        const boldMatch = trimmed.match(/\*\*(.+?)\*\*\s*(?:\((.+?)\))?/);
+        if (boldMatch) {
+          actionItems.push({
+            id: `a${actionIdx++}`,
+            task: boldMatch[1],
+            owner: boldMatch[2] || 'TBD',
+            priority: 'medium',
+            due: 'This week'
+          });
+        }
+        return;
       }
-      if (lower.includes(' will ') || lower.includes(' need to ') || lower.includes('action') || lower.includes('todo') || lower.includes('follow up') || lower.includes('next step')) {
-        actionItems.push({ id: `a${idx}`, task: clean, owner: 'TBD', priority: 'medium', due: 'This week' });
+
+      if (isNextSteps && trimmed.startsWith('- ')) {
+        const clean = trimmed.slice(2).replace(/\*\*/g, '');
+        const ownerMatch = clean.match(/\(([^)]+)\)\s*$/);
+        actionItems.push({
+          id: `a${actionIdx++}`,
+          task: ownerMatch ? clean.replace(ownerMatch[0], '').trim() : clean,
+          owner: ownerMatch ? ownerMatch[1] : 'TBD',
+          priority: 'medium',
+          due: 'This week'
+        });
+        return;
       }
-      if (clean.includes('?')) {
-        questions.push(clean);
+
+      const bulletClean = trimmed.replace(/^[-*]\s*/, '').replace(/\*\*/g, '').trim();
+      if (!bulletClean || bulletClean.length < 5) return;
+
+      if (isDecision && trimmed.startsWith('- ')) {
+        decisions.push({ id: `d${idx}`, text: bulletClean, owner: 'Team' });
+        return;
       }
-      if (clean.includes('“') || clean.includes('”') || (clean.includes('"') && clean.length > 20)) {
-        quotes.push({ id: `q${idx}`, text: clean, speaker: 'Speaker', theme: 'Key point' });
+
+      if (isBlocker && trimmed.startsWith('- ')) {
+        blockers.push({ id: `b${idx}`, issue: bulletClean, resolution: 'Pending', severity: 'medium' });
+        return;
+      }
+
+      if (!isNextSteps && !isDecision && !isBlocker) {
+        if (lower.includes('decision:') || lower.includes('decided') || lower.includes('agreed to')) {
+          decisions.push({ id: `d${idx}`, text: bulletClean, owner: 'Team' });
+        }
+        if ((lower.includes('blocker') || lower.includes('blocked') || lower.includes('concern') || lower.includes('frustrat')) && trimmed.startsWith('- ')) {
+          blockers.push({ id: `b${idx}`, issue: bulletClean, resolution: 'Pending', severity: 'medium' });
+        }
+        if (bulletClean.includes('”') || bulletClean.includes('”')) {
+          const quoteMatch = bulletClean.match(/[“”](.+?)[“”]/) || bulletClean.match(/”(.+?)”/);
+          if (quoteMatch) {
+            quotes.push({ id: `q${idx}`, text: quoteMatch[1], speaker: 'Speaker', theme: currentSection || 'Key point' });
+          }
+        }
       }
     });
 
