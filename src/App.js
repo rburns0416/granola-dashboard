@@ -233,12 +233,37 @@ export default function GranolaDashboardSystem() {
     );
   }
 
+  const renderMarkdown = (md) => {
+    if (!md) return null;
+    return md.split('\n').map((line, i) => {
+      if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-semibold text-white mt-6 mb-2">{line.slice(4)}</h3>;
+      if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold text-white mt-8 mb-3">{line.slice(3)}</h2>;
+      if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold text-white mt-8 mb-3">{line.slice(2)}</h1>;
+      if (line.startsWith('- [ ] ')) return <div key={i} className="flex items-start gap-2 ml-4 my-1"><span className="text-slate-500 mt-0.5">&#9744;</span><span className="text-slate-300">{line.slice(6)}</span></div>;
+      if (line.startsWith('- [x] ')) return <div key={i} className="flex items-start gap-2 ml-4 my-1"><span className="text-green-400 mt-0.5">&#9745;</span><span className="text-slate-400 line-through">{line.slice(6)}</span></div>;
+      if (line.match(/^[-*] /)) return <div key={i} className="flex items-start gap-2 ml-4 my-1"><span className="text-slate-500">•</span><span className="text-slate-300">{line.slice(2)}</span></div>;
+      if (line.match(/^\d+\. /)) return <div key={i} className="flex items-start gap-2 ml-4 my-1"><span className="text-slate-500 font-medium">{line.match(/^\d+/)[0]}.</span><span className="text-slate-300">{line.replace(/^\d+\.\s*/, '')}</span></div>;
+      if (line.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-cyan-500/50 pl-4 py-1 my-2 text-slate-300 italic">{line.slice(2)}</blockquote>;
+      if (line.startsWith('---') || line.startsWith('***')) return <hr key={i} className="border-slate-700 my-4" />;
+      if (line.trim() === '') return <div key={i} className="h-2" />;
+      const formatted = line
+        .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>');
+      return <p key={i} className="text-slate-300 my-1" dangerouslySetInnerHTML={{ __html: formatted }} />;
+    });
+  };
+
   // Meeting detail view
   if (selectedMeeting && meetingDetail) {
-    const type = detectMeetingType(selectedMeeting.title || selectedMeeting.name);
+    const title = meetingDetail.title || selectedMeeting.title || selectedMeeting.name;
+    const type = detectMeetingType(title);
     const style = getMeetingTypeStyle(type);
-    const extracted = extractData(meetingDetail);
-    const rawContent = meetingDetail.notes || meetingDetail.private_notes || meetingDetail.content || meetingDetail.summary || meetingDetail.ai_summary || '';
+    const summaryMd = meetingDetail.summary_markdown || '';
+    const summaryText = meetingDetail.summary_text || '';
+    const transcript = meetingDetail.transcript || '';
+    const attendees = meetingDetail.attendees || selectedMeeting.attendees || [];
+    const webUrl = meetingDetail.web_url || '';
+    const createdAt = meetingDetail.created_at || selectedMeeting.created_at || selectedMeeting.date;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
@@ -248,48 +273,52 @@ export default function GranolaDashboardSystem() {
           <div className="border-b border-slate-700 pb-6 mb-8">
             <div className="flex items-center gap-3 mb-2">
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${style.bg} ${style.border} border ${style.text}`}>{style.label}</span>
-              <span className="text-slate-500 text-sm">{formatDate(selectedMeeting.date || selectedMeeting.created_at)}</span>
+              <span className="text-slate-500 text-sm">{formatDate(createdAt)}</span>
+              {webUrl && <a href={webUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">Open in Granola</a>}
             </div>
-            <h1 className={`text-3xl font-bold bg-gradient-to-r ${style.gradient} bg-clip-text text-transparent`}>{selectedMeeting.title || selectedMeeting.name}</h1>
+            <h1 className={`text-3xl font-bold bg-gradient-to-r ${style.gradient} bg-clip-text text-transparent`}>{title}</h1>
+            {attendees.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {attendees.map((a, i) => (
+                  <span key={i} className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-full text-xs text-slate-400">
+                    {a.name || a.email || a}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
-            {displaySettings.showActions && (
+            {summaryMd && (
               <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                <button onClick={() => toggleSection('actions')} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-750 transition">
-                  <h2 className="text-lg font-semibold text-white">Action Items <span className="text-sm text-slate-500 ml-2">({extracted.actionItems.length})</span></h2>
-                  <ChevronDown className={`w-5 h-5 text-slate-400 transition ${expandedSections.actions ? 'rotate-180' : ''}`} />
+                <button onClick={() => toggleSection('summary')} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-750 transition">
+                  <h2 className="text-lg font-semibold text-white">Meeting Summary</h2>
+                  <ChevronDown className={`w-5 h-5 text-slate-400 transition ${expandedSections.summary !== false ? 'rotate-180' : ''}`} />
                 </button>
-                {expandedSections.actions && (
-                  <div className="px-6 py-4 border-t border-slate-700 space-y-3">
-                    {extracted.actionItems.length === 0 && <p className="text-slate-500 text-sm">No action items extracted</p>}
-                    {extracted.actionItems.map(item => <ActionItemCard key={item.id} item={item} />)}
+                {expandedSections.summary !== false && (
+                  <div className="px-6 py-4 border-t border-slate-700">
+                    {renderMarkdown(summaryMd)}
                   </div>
                 )}
               </div>
             )}
 
-            {displaySettings.showDecisions && (
-              <CollapsibleSection title="Decisions" section="decisions" items={extracted.decisions} />
+            {!summaryMd && summaryText && (
+              <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-white mb-4">Meeting Summary</h2>
+                <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">{summaryText}</p>
+              </div>
             )}
 
-            {displaySettings.showBlockers && extracted.blockers.length > 0 && (
-              <CollapsibleSection title="Blockers" section="blockers" items={extracted.blockers} isBlocker />
-            )}
-
-            {displaySettings.showQuotes && extracted.quotes.length > 0 && (
-              <CollapsibleSection title="Key Quotes" section="quotes" items={extracted.quotes} isQuote />
-            )}
-
-            {rawContent && (
+            {transcript && (
               <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                <button onClick={() => toggleSection('raw')} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-750 transition">
-                  <h2 className="text-lg font-semibold text-white">Full Notes</h2>
-                  <ChevronDown className={`w-5 h-5 text-slate-400 transition ${expandedSections.raw ? 'rotate-180' : ''}`} />
+                <button onClick={() => toggleSection('transcript')} className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-750 transition">
+                  <h2 className="text-lg font-semibold text-white">Full Transcript</h2>
+                  <ChevronDown className={`w-5 h-5 text-slate-400 transition ${expandedSections.transcript ? 'rotate-180' : ''}`} />
                 </button>
-                {expandedSections.raw && (
-                  <div className="px-6 py-4 border-t border-slate-700">
-                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{rawContent}</pre>
+                {expandedSections.transcript && (
+                  <div className="px-6 py-4 border-t border-slate-700 max-h-96 overflow-y-auto">
+                    <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">{transcript}</pre>
                   </div>
                 )}
               </div>
